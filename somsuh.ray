@@ -1,0 +1,109 @@
+uniform vec3      iResolution;           // viewport resolution (in pixels)
+uniform float     iTime;                 // shader playback time (in seconds)
+uniform float     iTimeDelta;            // render time (in seconds)
+uniform int       iFrame;                // shader playback frame
+uniform float     iChannelTime[4];       // channel playback time (in seconds)
+uniform vec3      iChannelResolution[4]; // channel resolution (in pixels)
+uniform vec4      iMouse;                // mouse pixel coords. xy: current (if MLB down), zw: click
+uniform samplerXX iChannel0..3;          // input channel. XX = 2D/Cube
+uniform vec4      iDate;                 // (year, month, day, time in seconds)
+uniform float     iSampleRate;           // sound sample rate (i.e., 44100)
+
+#define PI 3.14159265
+
+
+#define HASHSCALE1 .1031
+float hash12(vec2 p){
+	vec3 p3  = fract(vec3(p.xyx) * HASHSCALE1);
+    p3 += dot(p3, p3.yzx + 19.19);
+    return fract((p3.x + p3.y) * p3.z);
+}
+
+float randf(){
+    float time = iTime*0.1;
+    return mod(4.0,sin(time*time)+1.0)*0.75;
+}
+
+void mainImage( out vec4 fragColor, in vec2 fragCoord ){
+    vec2 uv = fragCoord.xy / iResolution.xy;
+
+    int on = 1;//should we apply the glitch ?
+    float amount = randf()*0.005;
+    float angle = (PI*randf())/(2.0*PI)-PI;
+    float seed = randf();
+    float seed_x = 0.5*randf()-0.5;
+    float seed_y = (0.3*randf()/0.6)-0.3;
+    float distortion_x = randf()*iResolution.x;
+    float distortion_y = randf()*iResolution.y;
+    float col_s = 0.3;
+
+
+    if(on != 0){
+
+        vec2 p = uv;
+        float xs = floor(fragCoord.x / 0.5);
+        float ys = floor(fragCoord.y / 0.5);
+        vec4 normal = texture(iChannel0, p*seed*seed);
+        if(p.y<distortion_x+col_s && p.y>distortion_x-col_s*seed) {
+            if(seed_x >0.0){
+                p.y = 1. - (p.y + distortion_y);
+            }
+            else {
+                p.y = distortion_y;
+            }
+        }
+        if(p.x<distortion_y+col_s && p.x>distortion_y-col_s*seed) {
+            if(seed_y>0.){
+                p.x=distortion_x;
+            }
+            else {
+                p.x = 1. - (p.x + distortion_x);
+            }
+        }
+        p.x+=normal.x*seed_x*(seed/5.);
+        p.y+=normal.y*seed_y*(seed/5.);
+        //base from RGB shift shader
+        //vec2 offset = amount * vec2( cos(angle), sin(angle));
+        //vec4 cr = texture(iChannel0, p + offset);
+        //vec4 cga = texture(iChannel0, p);
+        //vec4 cb = texture(iChannel0, p - offset);
+        fragColor = texture(iChannel0, p);//vec4(cr.r, cga.g, cb.b, cga.a);
+        //add noise
+        vec4 snow = 200.*amount*vec4(hash12(vec2(xs * seed,ys * seed*50.))*0.2);
+        fragColor = fragColor+ snow;
+    }
+    else {
+        fragColor = texture(iChannel0, uv);
+    }
+    
+    float vigentOffset = 0.005;
+    float darkness = 0.8;
+	float dist = distance(uv, vec2( 0.5 ));
+	fragColor.rgb *= smoothstep(0.8, vigentOffset * 0.799, dist *( darkness + vigentOffset ));
+    
+    fragColor.rgb = pow(fragColor.rgb, 1.0/vec3(2.2));
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
